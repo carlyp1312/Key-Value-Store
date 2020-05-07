@@ -94,3 +94,19 @@ def main(key):
         return data, status_code
 
 app.run(host="0.0.0.0", port=8085)
+
+
+#extract from VIEW (cmd) using os.environ (-e)
+#implement corresponding operations (GET, []) (PUT, add) (DELETE, remove) 
+#timeouts to detect when replicas are down. ex.-1 second (time library)
+#   try catch, send requests
+#broadcasting to other replicas (PUT, DELETE)
+#   boolean flag + forward requests using requests library, some sort of looping functionality to cover all replicas
+#   add replica: 
+#      add to everyones view (list ops)
+#      add key value store values
+#   delete replica: 
+#      remove from everyones view (list ops)
+
+
+# vector clock implementation: list of length, # of replicas 
