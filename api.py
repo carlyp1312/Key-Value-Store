@@ -10,10 +10,16 @@ store = {}
 
 # print(os.environ['FORWARDING_ADDRESS'])
 isMain = True
-envvar = os.getenv('FORWARDING_ADDRESS', default=None) #forwarding address = ip address of the main instance
-if(envvar is not None):
-    baseUrl = 'http://' + str(envvar)
+views = os.getenv('VIEW', default=None) #forwarding address = ip address of the main instance
+if(views is not None):
+    views_list = views.split(',')
+    
+socket_address = os.getenv('SOCKET_ADDRESS', default=None)
+if(socket_address is not None):
+    baseUrl = 'http://' + str(socket_address)
     isMain = False
+
+
 
 @app.route('/key-value-store/<key>', methods=['PUT', 'GET', 'DELETE'])
 def main(key):
@@ -93,6 +99,48 @@ def main(key):
 
         return data, status_code
 
+
+@app.route('/key-value-store-view', methods=['PUT', 'GET', 'DELETE'])
+def main():
+    if request.method == 'PUT':
+        if socket_address in views_list:
+            data = {"error":"Socket address already exists in the view","message":"Error in PUT"}
+            status_code = 404
+        else:
+            #BROADCAST
+            for v in views_list:
+                if(v != socket_address):
+                    #CHECK IF WE NEED TO SEND VALS 
+                    r = requests.put('http://' + str(v)+ '/key-value-store-view',  json={"socket-address": str(v)})
+
+            views_list.append(socket_address)
+            data = {"message":"Replica added successfully to the view"}
+            status_code = 201
+                
+    if request.method == 'GET':
+        if socket_address in views_list:
+            data = {"message":"View retrieved successfully","view":views_list}
+            status_code = 200
+        else:
+            #ignore in some sense, CHECK TEST SCRIPT
+            data = {"error":"Socket address does not exist in the view", "message":"Error in GET"}
+            status_code = 404
+
+
+    if request.method == 'DELETE':
+        if socket_address in views_list:
+            views_list.remove(socket_address)
+            #BROADCAST
+            for v in views_list:
+                if(v != socket_address):
+                    r = requests.delete('http://' + str(v) + '/key-value-store-view')
+            data = {"message":"Replica deleted successfully from the view"}
+            status_code = 200
+        else:
+            data =  {"error":"Socket address does not exist in the view", "message":"Error in DELETE"}
+            status_code = 404
+
+            
 app.run(host="0.0.0.0", port=8085)
 
 
