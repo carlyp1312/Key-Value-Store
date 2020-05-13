@@ -101,7 +101,7 @@ def main(key):
 
 
 @app.route('/key-value-store-view', methods=['PUT', 'GET', 'DELETE'])
-def main():
+def viewmain():
     if request.method == 'PUT':
         if socket_address in views_list:
             data = {"error":"Socket address already exists in the view","message":"Error in PUT"}
@@ -139,6 +139,7 @@ def main():
         else:
             data =  {"error":"Socket address does not exist in the view", "message":"Error in DELETE"}
             status_code = 404
+    return data, status_code
 
             
 app.run(host="0.0.0.0", port=8085)
