@@ -8,6 +8,10 @@ app = Flask(__name__)
 app.config["DEBUG"] = True
 store = {}
 
+# this file represents just one replica
+# we can get this replica's vector clock position through its socket address position in the view environmental variable
+# from there we can start comparing vector clocks
+# replica's causal metadata = vector_clock, sender's causal metadata = vc
 # print(os.environ['FORWARDING_ADDRESS'])
 isMain = True
 views = os.getenv('VIEW', default=None) #forwarding address = ip address of the main instance
