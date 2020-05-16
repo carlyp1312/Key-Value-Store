@@ -13,6 +13,7 @@ store = {}
 # from there we can start comparing vector clocks
 # replica's causal metadata = vector_clock, sender's causal metadata = vc
 # print(os.environ['FORWARDING_ADDRESS'])
+
 isMain = True
 views = os.getenv('VIEW', default=None) #forwarding address = ip address of the main instance
 if(views is not None):
@@ -23,47 +24,61 @@ if(socket_address is not None):
     baseUrl = 'http://' + str(socket_address)
     isMain = False
 
-vector_clock = []
+vector_clock = {}
+buffer = []
 
 #initialize, send, recieve, increment@, max functions
 
 def initialize():
     for v in views_list:
-        vector_clock.append(0)
+        vector_clock[v] = 0
 
 def pointwiseMax(vc):
     new_vector_clock = []
     for i in range(len(vector_clock)):
         new_vector_clock.append(max(vector_clock[i], vc[i]))
-    return new_vector_clock  
+    return new_vector_clock 
 
-def isLessThan(vc):
-    bools = []
-    bools2 = []
+#assumption: incremented before it was sent REMEMBER TO DO THAT 
+#might need to add another parameter
+def canDeliver(vc):
+    #vc must be <= vector_clock in every position besides senders position
+    #vc at senders position == vector_clock at senders position plus one 
+    #else queue 
 
-    for i in range(len(vector_clock)):
-        if(vector_clock[i] <= vc[i]):
-            bools[i] = True
-        else:
-            bools[i] = False
+
+
+
+
+
+
+# def isLessThan(vc):
+#     bools = []
+#     bools2 = []
+
+#     for i in range(len(vector_clock)):
+#         if(vector_clock[i] <= vc[i]):
+#             bools[i] = True
+#         else:
+#             bools[i] = False
     
-    for i in range(len(vector_clock)):
-        if(vc[i] <= vector_clock[i]):
-            bools2[i] = True
-        else:
-            bools2[i] = False
+#     for i in range(len(vector_clock)):
+#         if(vc[i] <= vector_clock[i]):
+#             bools2[i] = True
+#         else:
+#             bools2[i] = False
 
-    if False in bools & False in bools2:
-        islessthan = "independent"
+#     if False in bools & False in bools2:
+#         islessthan = "independent"
 
-    allTrue = True
-    for b in bools2:
-        if b == False:
-            allTrue = False 
-            break
+#     allTrue = True
+#     for b in bools2:
+#         if b == False:
+#             allTrue = False 
+#             break
     
-    if allTrue == True:
-        islessthan = "causally (before)dependent"
+#     if allTrue == True:
+#         islessthan = "causally (before)dependent"
         
 
 # can bools have all trues? that means the receiving
@@ -86,6 +101,11 @@ def isLessThan(vc):
 def main(key):
     if isMain == False:
         #PUT request
+        saddress = # replica-socket-address extraction from curl command
+        vc = # causal metadata extraction from curl command
+        # for v in views_list:
+        #     if (saddress == v):
+        #         canDeliver(vc, saddress)
         if request.method == 'PUT':
             try:
                 r = requests.put(baseUrl + '/key-value-store/' + str(key), json={'value': request.json.get('value')})
