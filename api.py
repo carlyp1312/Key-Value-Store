@@ -41,20 +41,44 @@ def pointwiseMax(vc):
 
 #assumption: incremented before it was sent REMEMBER TO DO THAT 
 #might need to add another parameter
-def canDeliver(vc, sa):
-    #vc must be <= vector_clock in every position besides senders position
-    for i in range(len(vc)):
-        if():
+def canDeliver(causalHistory):
+    for ch in causalHistory: 
+        for i in ch:
+            if(i != socket_address):
+                if(ch[i] > vector_clock[i]):
+                    addtoQueue(ch)
+                    return False
+                    break
+            # only client sends requests, but client doesnt have a position 
+            # in the vector clock, so this comparison below probably 
+            # doesn't work. we have to check for client as some 3rd party source,
+            # to buffer requests and get everything causally ordered.  
+            else:
+                if(ch[i] + 1 != vector_clock[i]):
+                    addtoQueue(ch)
+                    return False 
+                    break
             
-            
-    #vc at senders position == vector_clock at senders position plus one 
-    #else queue 
+    return True
+
+def addToQueue(vc):
+    #put current request on pause?
+    # -.sleep()?
+    buffer.append(vc)
+
+def removeFromQueue(vc):
+    #unpause request 
+    buffer.remove(0)
+    #and perform action? 
+    
+ 
 
 # This endpoint below will specify which replica getting the curl request, 
 # when the @app.route functionality gets the socket address of the replica
 # from the curl request endpoint.
 @app.route('/key-value-store/<key>', methods=['PUT', 'GET', 'DELETE'])
 def main(key):
+    #is this the vector clock were looking for 
     #PUT request
     metadata = request.json.get('causal-metadata') # causal metadata extraction from curl command
     if metadata == '':
@@ -65,7 +89,7 @@ def main(key):
                 if i == socket_address:
                     vector_clock[i] += 1
             key_value_store[key] = request.json.get('value') #updates local key value store
-            metadata_store.append(vector_clock) #updates local causal metadata store
+            metadata_store.append(vector_clock) #updates LOCAL causal metadata store 
             data = '{"message":"Added successfully", "causal-metadata": ' + vector_clock + '}'
             status_code = 201
             # tores , broadcoast to obroadcastcas
@@ -80,11 +104,30 @@ def main(key):
             if request.method == 'DELETE':
                 data = {"error":"Non-existent key","message":"Error in DELETE"}
                 status_code = 404
+                
+    #WHEN METADATA IS NOT EMPTY
     else:
-        # for i in vector_clock:
-        #     if i == socket_address:
-        #         vector_clock[i] += 1
-        canDeliver(metadata, socket_address)
+        #check if same replica
+        for i in vector_clock:
+            if i == socket_address:
+                vector_clock[i] += 1
+
+        # change to single vector clock at a time?
+        canDeliver(metadata)
+        vctclcklist = []
+        vctclcklist.append(vector_clock)
+
+
+
+
+        #if ^^^^^^ true, do the action: PUT, GET, DELETE
+        canDeliver(queue)
+        #if ^^^^^ true: remove from q, do action
+        removeFromQueue(queue[wtv])
+        
+
+
+
 
 @app.route('/key-value-store-view', methods=['PUT', 'GET', 'DELETE'])
 def viewmain():
