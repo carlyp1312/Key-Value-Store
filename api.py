@@ -26,6 +26,7 @@ if(socket_address is not None):
 
 vector_clock = {}
 buffer = []
+sendpos = 0
 
 #initialize, send, recieve, increment@, max functions
 
@@ -41,24 +42,26 @@ def pointwiseMax(vc):
 
 #assumption: incremented before it was sent REMEMBER TO DO THAT 
 #might need to add another parameter
-def canDeliver(causalHistory):
-    for ch in causalHistory: 
-        for i in ch:
-            if(i != socket_address):
-                if(ch[i] > vector_clock[i]):
-                    addtoQueue(ch)
-                    return False
-                    break
-            # only client sends requests, but client doesnt have a position 
-            # in the vector clock, so this comparison below probably 
-            # doesn't work. we have to check for client as some 3rd party source,
-            # to buffer requests and get everything causally ordered.  
-            else:
-                if(ch[i] + 1 != vector_clock[i]):
-                    addtoQueue(ch)
-                    return False 
-                    break
-            
+def canDeliver(vc, sp): 
+    for i in vc:
+        #
+        if(i != sp):
+            if(vc[i] > vector_clock[i]):
+                addtoQueue(vc)
+                return False
+                break
+        # only client sends requests, but client doesnt have a position 
+        # in the vector clock, so this comparison below probably 
+        # doesn't work. we have to check for client as some 3rd party source,
+        # to buffer requests and get everything causally ordered.  
+        elif(i==sp):
+            if(vc[i] + 1 != vector_clock[i]):
+                addtoQueue(vc)
+                return False 
+                break
+        else:
+            # and this is client code
+                 
     return True
 
 def addToQueue(vc):
@@ -80,6 +83,7 @@ def removeFromQueue(vc):
 def main(key):
     #is this the vector clock were looking for 
     #PUT request
+
     metadata = request.json.get('causal-metadata') # causal metadata extraction from curl command
     if metadata == '':
         initialize() # set all vector clock positions to zero
@@ -88,6 +92,7 @@ def main(key):
             for i in vector_clock:
                 if i == socket_address:
                     vector_clock[i] += 1
+                    sendpos = i
             key_value_store[key] = request.json.get('value') #updates local key value store
             metadata_store.append(vector_clock) #updates LOCAL causal metadata store 
             data = '{"message":"Added successfully", "causal-metadata": ' + vector_clock + '}'
@@ -95,7 +100,7 @@ def main(key):
             # tores , broadcoast to obroadcastcas
             for i in vector_clock:
                 if i != socket_address: # broadcast to every replica other than current replica
-                    r = requests.put(baseUrl + '/key-value-store/' + str(key), json={'value': request.json.get('value')})
+                    r = requests.put(baseUrl + '/key-value-store/' + str(key), json={'value': request.json.get('value')})          
             return data, status_code
         else:
             if request.method == 'GET':
@@ -107,17 +112,17 @@ def main(key):
                 
     #WHEN METADATA IS NOT EMPTY
     else:
+        actualsender = sendpos
         #check if same replica
         for i in vector_clock:
             if i == socket_address:
                 vector_clock[i] += 1
+                sendpos = i
 
         # change to single vector clock at a time?
-        canDeliver(metadata)
+        canDeliver(metadata, actualsender)
         vctclcklist = []
         vctclcklist.append(vector_clock)
-
-
 
 
         #if ^^^^^^ true, do the action: PUT, GET, DELETE
@@ -125,9 +130,6 @@ def main(key):
         #if ^^^^^ true: remove from q, do action
         removeFromQueue(queue[wtv])
         
-
-
-
 
 @app.route('/key-value-store-view', methods=['PUT', 'GET', 'DELETE'])
 def viewmain():
