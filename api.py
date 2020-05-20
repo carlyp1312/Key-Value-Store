@@ -1,4 +1,4 @@
-import flask, os
+adatimport flask, os
 from flask import Flask, request, json
 # import docker
 import requests
@@ -40,39 +40,48 @@ def pointwiseMax(vc):
         new_vector_clock.append(max(vector_clock[i], vc[i]))
     return new_vector_clock 
 
-#assumption: incremented before it was sent REMEMBER TO DO THAT 
-#might need to add another parameter
-def canDeliver(vc, sp): 
-    for i in vc:
-        #
-        if(i != sp):
-            if(vc[i] > vector_clock[i]):
-                addtoQueue(vc)
-                return False
-                break
-        # only client sends requests, but client doesnt have a position 
-        # in the vector clock, so this comparison below probably 
-        # doesn't work. we have to check for client as some 3rd party source,
-        # to buffer requests and get everything causally ordered.  
-        elif(i==sp):
-            if(vc[i] + 1 != vector_clock[i]):
-                addtoQueue(vc)
-                return False 
-                break
-        else:
-            # and this is client code
-                 
+
+def isLessThan(vc):
+    if len(vc) == 0:
+        return False
+
+    for key in vc:
+        if(vc[key] > vector_clock[key]):
+            addToQueue(vc)
+            return False
     return True
 
+
+# #assumption: incremented before it was sent REMEMBER TO DO THAT 
+# #might need to add another parameter
+# def canDeliver(vc, sp): 
+#     for i in vc:
+#         #
+#         if(i != sp):
+#             if(vc[i] > vector_clock[i]):
+#                 addtoQueue(vc)
+#                 return False
+#                 break
+#         # only client sends requests, but client doesnt have a position 
+#         # in the vector clock, so this comparison below probably 
+#         # doesn't work. we have to check for client as some 3rd party source,
+#         # to buffer requests and get everything causally ordered.  
+#         elif(i==sp):
+#             if(vc[i] + 1 != vector_clock[i]):
+#                 addtoQueue(vc)
+#                 return False 
+#                 break
+#         else:
+# #             # and this is client code
+                 
+#     return True
+
 def addToQueue(vc):
-    #put current request on pause?
-    # -.sleep()?
     buffer.append(vc)
+    time.sleep(1)
 
 def removeFromQueue(vc):
-    #unpause request 
     buffer.remove(0)
-    #and perform action? 
     
  
 
@@ -119,16 +128,12 @@ def main(key):
                 vector_clock[i] += 1
                 sendpos = i
 
-        # change to single vector clock at a time?
-        canDeliver(metadata, actualsender)
-        vctclcklist = []
-        vctclcklist.append(vector_clock)
 
-
-        #if ^^^^^^ true, do the action: PUT, GET, DELETE
-        canDeliver(queue)
-        #if ^^^^^ true: remove from q, do action
-        removeFromQueue(queue[wtv])
+        if isLessThan(metadata) == True:
+            #execute request 
+        
+        if isLessThan(buffer[0]) == True:
+            removeFromQueue(buffer[0])
         
 
 @app.route('/key-value-store-view', methods=['PUT', 'GET', 'DELETE'])
