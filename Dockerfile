@@ -8,7 +8,7 @@ RUN pip install Flask
 
 RUN pip install requests
 
-CMD ["python", "-u", "./api2.py"]
+CMD ["python", "-u", "./api.py"]
 
 COPY . .
 
