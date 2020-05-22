@@ -36,36 +36,13 @@ def get_store1():
     data = {"store": metadata_store}
     return data
 
-def canDeliver1(sender_vc): # when client sends a request to this replica
-    if sender_vc == '':
-        return True
-    else:
-        for position in vector_clock:
-            if (sender_vc[position] > vector_clock[position]):
-                return False
-        return True
-
-def canDeliver2(sender_sa, sender_vc): # when replica sends a request to another replica
-    for position in vector_clock:
-        if position == sender_sa:
-            if sender_vc[position] != vector_clock[position] + 1:
-                return False
-        else:
-            if sender_vc[position] > vector_clock[position]:
-                return False
-    return True
-
 @app.route('/broadcast/<key>', methods=['PUT']) # write broadcast (replica to replica)
 def broadcast(key):
     metadata = request.json.get('causal-metadata')
     if request.method == 'PUT': # regardless of the metadata being empty or not, increment the vector clock by one in the sender's position
-        deliverable = canDeliver2(request.json.get('sender'), request.json.get('vector-clock'))
-        if deliverable == True:
-            vector_clock[request.json.get('sender')] += 1 # increment local vector clock by one in the sender's position
-            key_value_store[key] = request.json.get('value') # updates local key value store
-            metadata_store[str(len(metadata_store))] = vector_clock.copy()
-        else:
-            queue.append(request) # add this request to queue if it is not deliverable
+        vector_clock[request.json.get('sender')] += 1 # increment local vector clock by one in the sender's position
+        key_value_store[key] = request.json.get('value') # updates local key value store
+        metadata_store[str(len(metadata_store))] = vector_clock.copy()
 
 # When a replica is reconnected, what happens to its vector clock? Current implementation is that it is updated as if it was sending and receiving messages
 # Queue behavior?
@@ -83,34 +60,35 @@ def store_main(key):
             except: # replica is down, no need to do anything here
                 continue
 
-    if request.method == 'PUT': 
+    if request.method == 'PUT' or request.method == 'DELETE': 
         metadata = request.json.get('causal-metadata') # causal metadata extraction from curl command
-        deliverable = canDeliver1(metadata) # if false, add to buffer. if not, proceed with request
-        if deliverable == True:
-            if request in queue: # remove this request from queue if it exists
-                queue.remove(request)
-            vector_clock[socket_address] += 1 # increment local vector clock by one in its own position
-            if key in key_value_store:
-                status_code = 200 # update existing key's value
-            else:
-                status_code = 201 # add new key value pair
-            key_value_store[key] = request.json.get('value') # updates local key value store
-            data = {"message": "Added successfully", "causal-metadata": vector_clock}
-            metadata_store[str(len(metadata_store))] = vector_clock.copy()
-            for replica in vector_clock.keys():
-               if replica != socket_address:
-                   try: # broadcast request to every other running replica
-                      requests.put('http://' + replica + '/broadcast/' + key, timeout=1, json={'sender': socket_address, 'value': request.json.get('value'), 'vector-clock': vector_clock})
-                   except ConnectionError: # replica is either disconnected or killed
-                        for v in views_list:
-                            if replica != v:
-                                try: # regardless if the replica is disconnected or killed, remove it from every running replica's view list
-                                    requests.delete('http://' + v + '/key-value-store-view', timeout=1, json={'socket-address': replica})
-                                except:
-                                    continue
-            return data, status_code
+        vector_clock[socket_address] += 1 # increment local vector clock by one in its own position
+        if key in key_value_store:
+            status_code = 200 # update existing key's value
         else:
-            queue.append(request) # add this request to queue if it is not deliverable
+            if request.method == 'DELETE':
+                data = {"message": "Key does not exit", "error": "Error in DELETE"}
+                status_code = 404
+                return data, status_code
+            status_code = 201 # add new key value pair
+        val = request.json.get('value')
+        if request.method == 'DELETE':
+            val = None
+        key_value_store[key] = val # updates local key value store
+        data = {"message": "Added successfully", "causal-metadata": vector_clock}
+        metadata_store[str(len(metadata_store))] = vector_clock.copy()
+        for replica in vector_clock.keys():
+           if replica != socket_address:
+               try: # broadcast request to every other running replica
+                  requests.put('http://' + replica + '/broadcast/' + key, timeout=1, json={'sender': socket_address, 'value': request.json.get('value'), 'causal-metadata': metadata})
+               except ConnectionError: # replica is either disconnected or killed
+                    for v in views_list:
+                        if replica != v:
+                            try: # regardless if the replica is disconnected or killed, remove it from every running replica's view list
+                                requests.delete('http://' + v + '/key-value-store-view', timeout=1, json={'socket-address': replica})
+                            except:
+                                continue
+        return data, status_code
 
     if request.method == 'GET':
         if key in key_value_store.keys():
