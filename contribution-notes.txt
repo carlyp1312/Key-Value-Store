@@ -1,4 +1,4 @@
 Carl Yahata-Pettersson: Fault tolerance and broadcasting code, and ensuring the code worked with test cases.
 Disha Mevada: Implementing causal consistency and view operations
 Pranav Nampoothiri: Causal consistency and view operations. Implemented one version of buffering. Assisted with testing.
-
+Prateek Narayanan: Causal consistency and view operations
