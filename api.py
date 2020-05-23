@@ -36,13 +36,17 @@ def get_store1():
     data = {"store": metadata_store}
     return data
 
-@app.route('/broadcast/<key>', methods=['PUT']) # write broadcast (replica to replica)
+@app.route('/broadcast/<key>', methods=['PUT', 'DELETE']) # write broadcast (replica to replica)
 def broadcast(key):
     metadata = request.json.get('causal-metadata')
-    if request.method == 'PUT': # regardless of the metadata being empty or not, increment the vector clock by one in the sender's position
+    val = request.json.get('value')
+    if request.method == 'PUT' or request.method == 'DELETE': # regardless of the metadata being empty or not, increment the vector clock by one in the sender's position
         vector_clock[request.json.get('sender')] += 1 # increment local vector clock by one in the sender's position
-        key_value_store[key] = request.json.get('value') # updates local key value store
         metadata_store[str(len(metadata_store))] = vector_clock.copy()
+        if request.method == 'PUT':
+            key_value_store[key] = val # updates local key value store
+        if request.method == 'DELETE':
+            key_value_store.pop(key, val)
 
 # When a replica is reconnected, what happens to its vector clock? Current implementation is that it is updated as if it was sending and receiving messages
 # Queue behavior?
@@ -72,15 +76,20 @@ def store_main(key):
                 return data, status_code
             status_code = 201 # add new key value pair
         val = request.json.get('value')
+        if request.method == 'PUT':
+            key_value_store[key] = val # updates local key value store
+            data = {"message": "Added successfully", "causal-metadata": vector_clock}
         if request.method == 'DELETE':
-            val = None
-        key_value_store[key] = val # updates local key value store
-        data = {"message": "Added successfully", "causal-metadata": vector_clock}
+            key_value_store.pop(key, val)
+            data = {"message": "Deleted successfully", "causal-metadata": vector_clock}
         metadata_store[str(len(metadata_store))] = vector_clock.copy()
         for replica in vector_clock.keys():
            if replica != socket_address:
                try: # broadcast request to every other running replica
-                  requests.put('http://' + replica + '/broadcast/' + key, timeout=1, json={'sender': socket_address, 'value': request.json.get('value'), 'causal-metadata': metadata})
+                  if request.method == 'PUT':
+                    requests.put('http://' + replica + '/broadcast/' + key, timeout=1, json={'sender': socket_address, 'value': val, 'causal-metadata': metadata})
+                  if request.method == 'DELETE':
+                    requests.delete('http://' + replica + '/broadcast/' + key, timeout=1, json={'sender': socket_address, 'value': val, 'causal-metadata': metadata})
                except ConnectionError: # replica is either disconnected or killed
                     for v in views_list:
                         if replica != v:
