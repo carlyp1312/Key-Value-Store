@@ -1,6 +1,6 @@
 FROM python:3
 
-WORKDIR /CSE138_Assignment3
+WORKDIR /CSE138_Assignment4
 
 RUN pip install Flask
 
