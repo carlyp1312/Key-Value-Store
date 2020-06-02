@@ -1,13 +1,23 @@
 import flask, os
 from flask import Flask, request, json
+from flask.ext.hashing import Hashing
 import requests
 from requests.exceptions import ConnectionError
 
 app = Flask(__name__) # create flask object
 app.config["DEBUG"] = True # set debugging option to true
+hashing = Hashing(app)
 key_value_store = {} # keeps track of all key value pairs
 metadata_store = {} # keeps track of causal history
 queue = [] # keeps track of requests that can not currently be delivered
+nodehashes = [] # keeps track of the hash values for nodes
+
+shardcount = os.getenv('SHARD_COUNT', default=None) #this extracts the shard count set for the instances run
+sharddict = {}
+# creating shards with dictionary. 
+for i in range(shardcount):
+    shardmembers = []
+    sharddict[i+1] = shardmembers #key is shard id, value is list of members/nodes (probably will be identified by socket addresses)
 
 views = os.getenv('VIEW', default=None) #forwarding address = ip address of the main instance
 views_list = []
@@ -21,7 +31,10 @@ for v in views_list:
             requests.put('http://' + v + '/key-value-store-view', json={'socket-address': socket_address})
         except:
             continue
-
+    #calculating the hash for nodes   
+    ip = v.split(':')
+    h = hashing.hash_value(ip[0], salt = '') #hash by ip address 
+    nodehashes.append(h) #create list of the hashes of nodes to store somewhere
 vector_clock = {}
 for v in views_list: # initialize vector_clock only when this replica is first created, not when it is reconnected
     vector_clock[str(v)] = 0 # v is the socket address (key), 0 is the corresponding value
@@ -63,6 +76,18 @@ def store_main(key):
                 vector_clock.update(metadata_store[str(len(metadata_store) - 1)]) # make sure the vector clock is the most recent one
             except: # replica is down, no need to do anything here
                 continue
+    
+    #hashing keys
+    hsh = hashing.hash_value(key, salt = '')
+    #finding successor
+    while(hsh not in nodehashes):
+        #check if hash of key is hash of any of the nodes
+        if (hsh in nodehashes):
+            #if so, check which node's hash the key's hash matches to
+            for i in range(len(nodehashes)):
+                if hsh==nodehashes[i]:
+                    # send request to this node
+        hsh+=1 #traverse through the ring to approach successors
 
     if request.method == 'PUT' or request.method == 'DELETE': 
         metadata = request.json.get('causal-metadata') # causal metadata extraction from curl command
@@ -84,13 +109,13 @@ def store_main(key):
             data = {"message": "Deleted successfully", "causal-metadata": vector_clock}
         metadata_store[str(len(metadata_store))] = vector_clock.copy()
         for replica in vector_clock.keys():
-           if replica != socket_address:
-               try: # broadcast request to every other running replica
-                  if request.method == 'PUT':
-                    requests.put('http://' + replica + '/broadcast/' + key, timeout=1, json={'sender': socket_address, 'value': val, 'causal-metadata': metadata})
-                  if request.method == 'DELETE':
-                    requests.delete('http://' + replica + '/broadcast/' + key, timeout=1, json={'sender': socket_address, 'value': val, 'causal-metadata': metadata})
-               except ConnectionError: # replica is either disconnected or killed
+            if replica != socket_address:
+                try: # broadcast request to every other running replica
+                    if request.method == 'PUT':
+                        requests.put('http://' + replica + '/broadcast/' + key, timeout=1, json={'sender': socket_address, 'value': val, 'causal-metadata': metadata})
+                    if request.method == 'DELETE':
+                        requests.delete('http://' + replica + '/broadcast/' + key, timeout=1, json={'sender': socket_address, 'value': val, 'causal-metadata': metadata})
+                except ConnectionError: # replica is either disconnected or killed
                     for v in views_list:
                         if replica != v:
                             try: # regardless if the replica is disconnected or killed, remove it from every running replica's view list
@@ -140,3 +165,4 @@ def view_main():
         return data, status_code
 
 app.run(host="0.0.0.0", port=8085)
+
