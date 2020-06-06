@@ -1,1 +1,2 @@
 Carl Yahata-Pettersson: Shard to node mapping, key to shard mapping, broadacsting of request to correct shard, hashing functions. Shard operations (test cases a-c) and put operatins (test case d)
+Prateek Narayanan: Shard to node mapping, key to shard mapping, hashing, shard operations (a-c)
