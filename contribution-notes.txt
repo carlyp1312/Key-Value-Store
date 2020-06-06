@@ -1,2 +1,5 @@
 Carl Yahata-Pettersson: Shard to node mapping, key to shard mapping, broadacsting of request to correct shard, hashing functions. Shard operations (test cases a-c) and put operatins (test case d)
 Prateek Narayanan: Shard to node mapping, key to shard mapping, hashing, shard operations (a-c)
+Pranav Nampoothiri: Worked on key-to-shard mapping, hashing, key count shard operation, worked on some of adding node shard operation
+Disha Mevada: Key to shard mapping, hashing function, shard operations, adding node operation.
+
