@@ -1,6 +1,6 @@
 FROM python:3
 
-WORKDIR /CSE138_Assignment4
+WORKDIR /Key-Value-Store
 
 RUN pip install Flask
 
